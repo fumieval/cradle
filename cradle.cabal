@@ -1,0 +1,30 @@
+cabal-version:      3.0
+name:               cradle
+version:            0
+synopsis:           Wrapper for an unstable resource
+-- description:
+homepage:           https://github.com/fumieval/cradle
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Fumiaki Kinoshita
+maintainer:         fumiexcel@gmail.com
+-- copyright:
+category:           Control
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+extra-source-files: README.md
+
+common warnings
+    ghc-options: -Wall -Wcompat
+
+library
+    import:           warnings
+    exposed-modules:  Cradle
+    -- other-modules:
+    -- other-extensions:
+    build-depends:    base >= 4.12 && <5,
+        retry,
+        unliftio-core,
+        exceptions
+    hs-source-dirs:   src
+    default-language: Haskell2010
