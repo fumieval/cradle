@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -15,6 +16,7 @@ module Cradle
   , showCradleEvent
   , logCradleEvent
   -- * Internal
+  , CradleCounter(..)
   , newEmptyCradle
   , acquireCradle
   , releaseCradle
@@ -27,17 +29,21 @@ import Control.Retry
 import Control.Monad.IO.Unlift
 import Data.Typeable
 
+-- | Sequential number for the content.
+-- This is used to prevent dropping a resource that just has been recreated.
+newtype CradleCounter = CradleCounter Int deriving (Show, Eq, Ord, Num)
+
 data CradleConfig a = CradleConfig
-  { acquire :: Int -> RetryStatus -> IO a
-  , release :: Int -> a -> IO ()
+  { acquire :: CradleCounter -> RetryStatus -> IO a
+  , release :: CradleCounter -> a -> IO ()
   , policy :: RetryPolicyM IO
   , shouldReacquire :: SomeException -> IO Bool
   }
 
 data CradleEvent a
-  = Acquiring Int RetryStatus
-  | Acquired Int
-  | Released Int
+  = Acquiring CradleCounter RetryStatus
+  | Acquired CradleCounter
+  | Released CradleCounter
   deriving Show
 
 showCradleEvent :: Typeable a => CradleEvent a -> String
@@ -80,7 +86,7 @@ cradleConfig create release = CradleConfig
 
 data Cradle a = Cradle
   { config :: CradleConfig a
-  , reference :: MVar (Int, Maybe a)
+  , reference :: MVar (CradleCounter, Maybe a)
   }
 
 withCradle
@@ -107,6 +113,8 @@ releaseCradle Cradle{ config = CradleConfig{..}, ..} = do
   mapM_ (release i) a
 
 -- | Run an action using the content of the 'Cradle'.
+-- When 'Reacquire' or any exception that satisfies 'shouldReacquire' is thrown,
+-- it releases the resource, then it tries to acquire a new one according to the retry 'policy'.
 takeCradle :: MonadUnliftIO m => Cradle a -> (a -> m r) -> m r
 takeCradle Cradle{ config = CradleConfig{..}, .. } cont = withRunInIO $ \runInIO -> recovering
   policy
