@@ -123,7 +123,9 @@ takeCradle Cradle{ config = CradleConfig{..}, .. } cont = withRunInIO $ \runInIO
     try (runInIO $ cont resource) >>= \case
       Right a -> pure a
       Left e -> do
-        b <- shouldReacquire e
+        b <- case fromException e of
+          Just Reacquire -> pure True
+          _ -> shouldReacquire e
         when b $ do
           modifyMVar_ reference $ \case
             -- Drop the existing resource when reacquisition is requested,
